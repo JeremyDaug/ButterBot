@@ -6,6 +6,8 @@ import pickle
 
 client = discord.Client()
 
+VERSION = '1.0.1'
+
 qwk_help = """For more specific help type help [topic].
 Topics are :
 - dice
@@ -78,17 +80,30 @@ votes = voting.voting()
 async def on_ready():
     print('logged in as')
     print(client.user.name)
+    print('Version %s' % VERSION)
     print(client.user.id)
     print('--------')
+
+
+def log(*args):
+    print('-----------------')
+    for arg in args:
+        print(arg)
+    return
+
 
 @client.event
 async def on_message(message):
     mess = message.content
+    log(message.author.name, message.channel, message.content)
     sp = mess.split()
     if sp[0] == '<@{}>'.format(client.user.id):
         if len(sp) <= 1:
             await client.send_message(message.channel, 'I can\'t do that.')
-        elif 'purpose' in message.content:
+        elif 'real purpose' in message.content.lower():
+            await client.send_message(message.channel,
+                                      'To roll dice and collect votes.')
+        elif 'purpose' in message.content.lower():
             await client.send_message(message.channel, 'To pass butter')
         elif 'help' == sp[1]:
             if len(sp) <= 2:
@@ -101,9 +116,8 @@ async def on_message(message):
                 await client.send_message(message.channel, request_help)
             else:
                 await client.send_message(message.channel, qwk_help)
-        elif 'real purpose' in message.content.lowercase():
-            await client.send_message(message.channel,
-                                      'To roll dice and collect votes.')
+        elif 'version' in message.content.lower():
+            await client.send_message(message.channel, VERSION)
     elif '.r' == sp[0]:
         await client.send_message(message.channel, rolling.roll(sp[1:]))
     elif mess.startswith('Create Vote'):
