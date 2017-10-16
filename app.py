@@ -6,7 +6,7 @@ import pickle
 
 client = discord.Client()
 
-VERSION = '1.0.2'
+VERSION = '1.0.3'
 
 qwk_help = """For more specific help type help [topic].
 Topics are :
@@ -137,8 +137,11 @@ async def on_message(message):
         await client.send_message(message.channel, 'Deleted ' + mess.lstrip('Delete Vote:'))
     elif mess.startswith('Vote:'):
         try:
+            print('Start call')
             result = votes.add_votes(mess.lstrip('Vote:'), message.author.id)
+            print('Result call')
             await client.send_message(message.channel, result)
+            print('End call')
         except:
             await client.send_message(message.channel, 'Please double check your vote, something seems to have gone wrong.')
     elif mess.startswith('Show Vote:'):
