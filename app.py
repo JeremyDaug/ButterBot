@@ -2,13 +2,15 @@ import discord
 import asyncio
 import rolling
 import voting
+import pickle
 
 client = discord.Client()
 
 qwk_help = """For more specific help type help [topic].
 Topics are :
 - dice
-- voting"""
+- voting
+- request"""
 
 dice_help = """The expression works like a simple equation parser with some extra operators.
 
@@ -34,24 +36,40 @@ O: Options in a comma separated list.
 N: Number of votes each person has. If value is greater then number of options
 then 1 vote per option is allowed.
 
-Syntax to Vote
-Vote:[ID] :[option1, option2, ...]
+Syntax to Vote :
+Vote:[ID]:[option1, option2, ...]
 
 List all options you vote on, if you give more options then votes it will say
 so. You cannot vote for the same thing twice.
 
-To Delete Vote
+To Delete Vote :
 Delete Vote:[ID]
 
 Deletes the vote of ID if possible.
 
-To Save
+To Save :
 Save Votes
 
 Saves votes to file.
 
-To Load 
+To Load :
 Load Votes
+
+To Show Current Voting IDs :
+Show Vote IDs
+
+To Show Vote Results :
+Show Vote: [ID]
+"""
+
+request_help = """Syntax:
+Request: [Request]
+
+This is for requesting changes or features for butter bot.
+
+It will save them so that My Creator can act on them later.
+
+Thank you for the request.
 """
 
 votes = voting.voting()
@@ -79,8 +97,13 @@ async def on_message(message):
                 await client.send_message(message.channel, dice_help)
             elif sp[2] == 'voting':
                 await client.send_message(message.channel, voting_help)
+            elif sp[2] == 'request':
+                await client.send_message(message.channel, request_help)
             else:
                 await client.send_message(message.channel, qwk_help)
+        elif 'real purpose' in message.content.lowercase():
+            await client.send_message(message.channel,
+                                      'To roll dice and collect votes.')
     elif '.r' == sp[0]:
         await client.send_message(message.channel, rolling.roll(sp[1:]))
     elif mess.startswith('Create Vote'):
@@ -97,10 +120,31 @@ async def on_message(message):
         await client.send_message(message.channel, "Votes saved to file.")
     elif mess.startswith('Load Votes'):
         votes.load_votes()
-        await client.send_message(message.channel, 'Votes ')
+        await client.send_message(message.channel, 'Votes Loaded')
     elif mess.startswith('Delete Vote:'):
         votes.votes.pop(mess.lstrip('Delete Vote:'))
         await client.send_message(message.channel, 'Deleted ' + mess.lstrip('Delete Vote:'))
+    elif mess.startswith('Vote:'):
+        try:
+            result = votes.add_votes(mess.lstrip('Vote:'), message.author.id)
+            await client.send_message(message.channel, result)
+        except:
+            await client.send_message(message.channel, 'Please double check your vote, something seems to have gone wrong.')
+    elif mess.startswith('Show Vote:'):
+        try:
+            result = votes.show_vote(mess.lstrip('Show Vote:'))
+            await client.send_message(message.channel, result)
+        except KeyError:
+            await client.send_message(message.channel,
+                                      'Vote ID does not exist.')
+    elif mess.startswith('Show Vote IDs'):
+        await client.send_message(message.channel, votes.IDs())
+    elif mess.startswith('Request:'):
+        with open('request_File.txt', 'a') as f:
+            output = '%s: %s\n' % (message.author.name,
+                                   mess.lstrip('Request:').strip())
+            f.write(output)
+        await client.send_message(message.channel, "Thank you for the Request.")
     elif '<@{}>'.format(client.user.id) in sp or client.user.name in sp:
         await client.send_message(message.channel, 'You mentioned me, what do you want.')
 
