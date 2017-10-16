@@ -6,7 +6,7 @@ import pickle
 
 client = discord.Client()
 
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 
 qwk_help = """For more specific help type help [topic].
 Topics are :
@@ -32,11 +32,10 @@ The lowest or highest rolls can be selected with ^ and v. 6d6^3 will keep the hi
 
 voting_help = """Syntax To create Vote
 Create Vote ID:[Num] Q:[question] O:[option1, option2, ...] N:[Num Votes]
-ID: ID value of the 
+ID: ID value of the vote.
 Q: Question raised or asked, try to keep it simple.
 O: Options in a comma separated list.
-N: Number of votes each person has. If value is greater then number of options
-then 1 vote per option is allowed.
+N: Number of votes each person has. If value is greater then number of options then 1 vote per option is allowed.
 
 Syntax to Vote :
 Vote:[ID]:[option1, option2, ...]
@@ -61,8 +60,7 @@ To Show Current Voting IDs :
 Show Vote IDs
 
 To Show Vote Results :
-Show Vote: [ID]
-"""
+Show Vote: [ID]"""
 
 request_help = """Syntax:
 Request: [Request]
@@ -71,8 +69,7 @@ This is for requesting changes or features for butter bot.
 
 It will save them so that My Creator can act on them later.
 
-Thank you for the request.
-"""
+Thank you for the request."""
 
 votes = voting.voting()
 
@@ -99,20 +96,20 @@ async def on_message(message):
     sp = mess.split()
     if sp[0] == '<@{}>'.format(client.user.id):
         if len(sp) <= 1:
-            await client.send_message(message.channel, 'I can\'t do that.')
+            await client.send_message(message.channel, 'What do you want?')
         elif 'real purpose' in message.content.lower():
             await client.send_message(message.channel,
                                       'To roll dice and collect votes.')
         elif 'purpose' in message.content.lower():
             await client.send_message(message.channel, 'To pass butter')
-        elif 'help' == sp[1]:
+        elif 'help' == sp[1].lower():
             if len(sp) <= 2:
                 await client.send_message(message.channel, qwk_help)
-            elif sp[2] == 'dice':
+            elif sp[2].lower() == 'dice':
                 await client.send_message(message.channel, dice_help)
-            elif sp[2] == 'voting':
+            elif sp[2].lower() == 'voting':
                 await client.send_message(message.channel, voting_help)
-            elif sp[2] == 'request':
+            elif sp[2].lower() == 'request':
                 await client.send_message(message.channel, request_help)
             else:
                 await client.send_message(message.channel, qwk_help)

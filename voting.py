@@ -43,8 +43,14 @@ class voting:
         ret = ret[:-1]
         return ret
 
+    def remove_voter(self, ID, voter):
+        for i in self.votes[ID][opt]:
+            self.votes[ID][i].remove(voter)
+        return
+
     def add_votes(self, val, voter):
         ID, ballots = val.split(':')
+        self.remove_voter(ID, voter)
         if ID not in self.votes.keys():
             return "Invalid ID"
         ballots = [i.strip() for i in ballots.split(',')]
