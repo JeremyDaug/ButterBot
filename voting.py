@@ -38,28 +38,22 @@ class voting:
     def show_vote(self, ID):
         ret = '' + self.votes[ID]['Q:'] + '\n'
         for i in self.votes[ID][opt]:
-            print(i)
             ret += i + ': ' + str(len(self.votes[ID][i])) + '\n'
         ret = ret[:-1]
         return ret
 
     def remove_voter(self, ID, voter):
-        print('Start remove')
         for i in self.votes[ID][opt]:
             if voter in self.votes[ID][i]:
                 self.votes[ID][i].remove(voter)
-        print('End remove')
         return
 
     def add_votes(self, val, voter):
-        print('Start vote')
         ID, ballots = val.split(':')
-        print('next vote')
         self.remove_voter(ID, voter)
         if ID not in self.votes.keys():
             return "Invalid ID"
         ballots = [i.strip() for i in ballots.split(',')]
-        print(ballots)
         if len(ballots) > self.votes[ID]['N:']:
             return "Too Many Votes"
         ballots = set(ballots)

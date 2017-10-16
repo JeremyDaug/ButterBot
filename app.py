@@ -6,7 +6,7 @@ import pickle
 
 client = discord.Client()
 
-VERSION = '1.0.3'
+VERSION = '1.0.4'
 
 qwk_help = """For more specific help type help [topic].
 Topics are :
@@ -91,9 +91,8 @@ def log(*args):
 
 @client.event
 async def on_message(message):
-    mess = message.content
     log(message.author.name, message.channel, message.content)
-    sp = mess.split()
+    sp = message.content.split()
     if sp[0] == '<@{}>'.format(client.user.id):
         if len(sp) <= 1:
             await client.send_message(message.channel, 'What do you want?')
@@ -117,46 +116,45 @@ async def on_message(message):
             await client.send_message(message.channel, VERSION)
     elif '.r' == sp[0]:
         await client.send_message(message.channel, rolling.roll(sp[1:]))
-    elif mess.startswith('Create Vote'):
-        if mess.split("ID:")[1].split("Q:")[0].strip() in votes.votes:  # id
+    elif message.content.startswith('Create Vote'):
+        if message.content.split("ID:")[1].split("Q:")[0].strip() in votes.votes:  # id
             await client.send_message(message.channel, "Vote already exists. To Overwrite, delete previous first.")
         else:
             try:
-                new_vote = votes.create_vote(mess.lstrip("Create Vote"))
+                new_vote = votes.create_vote(message.content[11:])
                 await client.send_message(message.channel, "Vote %s created" % new_vote)
             except IndexError as e:
                 await client.send_message(message.channel, "You didn't put in the vote right. Try again.")
-    elif mess.startswith('Save Votes'):
+    elif message.content.startswith('Save Votes'):
         votes.save_votes()
         await client.send_message(message.channel, "Votes saved to file.")
-    elif mess.startswith('Load Votes'):
+    elif message.content.startswith('Load Votes'):
         votes.load_votes()
         await client.send_message(message.channel, 'Votes Loaded')
-    elif mess.startswith('Delete Vote:'):
-        votes.votes.pop(mess.lstrip('Delete Vote:'))
-        await client.send_message(message.channel, 'Deleted ' + mess.lstrip('Delete Vote:'))
-    elif mess.startswith('Vote:'):
+    elif message.content.startswith('Delete Vote:'):
+        votes.votes.pop(message.content[len('Delete Vote:'):])
+        await client.send_message(message.channel, 'Deleted '
+                                  + message.channel[len('Delete Vote:'):])
+    elif message.content.startswith('Vote:'):
         try:
-            print('Start call')
-            result = votes.add_votes(mess.lstrip('Vote:'), message.author.id)
-            print('Result call')
+            result = votes.add_votes(message.content[len('Vote:'):],
+                                     message.author.id)
             await client.send_message(message.channel, result)
-            print('End call')
         except:
             await client.send_message(message.channel, 'Please double check your vote, something seems to have gone wrong.')
-    elif mess.startswith('Show Vote:'):
+    elif message.content.startswith('Show Vote:'):
         try:
-            result = votes.show_vote(mess.lstrip('Show Vote:'))
+            result = votes.show_vote(message.content[len('Show Vote:'):].strip())
             await client.send_message(message.channel, result)
         except KeyError:
             await client.send_message(message.channel,
                                       'Vote ID does not exist.')
-    elif mess.startswith('Show Vote IDs'):
+    elif message.content.startswith('Show Vote IDs'):
         await client.send_message(message.channel, votes.IDs())
-    elif mess.startswith('Request:'):
+    elif message.content.startswith('Request:'):
         with open('request_File.txt', 'a') as f:
             output = '%s: %s\n' % (message.author.name,
-                                   mess.lstrip('Request:').strip())
+                                   message.content[len('Request:'):].strip())
             f.write(output)
         await client.send_message(message.channel, "Thank you for the Request.")
     elif '<@{}>'.format(client.user.id) in sp or client.user.name in sp:
