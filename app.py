@@ -6,7 +6,7 @@ import pickle
 
 client = discord.Client()
 
-VERSION = '1.0.4'
+VERSION = '1.0.5'
 
 qwk_help = """For more specific help type help [topic].
 Topics are :
@@ -79,7 +79,7 @@ async def on_ready():
     print(client.user.name)
     print('Version %s' % VERSION)
     print(client.user.id)
-    print('--------')
+    print('-----------------')
 
 
 def log(*args):
@@ -134,7 +134,7 @@ async def on_message(message):
     elif message.content.startswith('Delete Vote:'):
         votes.votes.pop(message.content[len('Delete Vote:'):])
         await client.send_message(message.channel, 'Deleted '
-                                  + message.channel[len('Delete Vote:'):])
+                                  + message.content[len('Delete Vote:'):])
     elif message.content.startswith('Vote:'):
         try:
             result = votes.add_votes(message.content[len('Vote:'):],

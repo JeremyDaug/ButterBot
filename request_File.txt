@@ -1,0 +1,2 @@
+Mechanical_Marvel: add some sort of "test" command to butterbot (either for the lols or to see if everythings working in chat)
+Mechanical_Marvel: Also maybe a "say" command so we can make him do embarassing and self-referential things in chat
