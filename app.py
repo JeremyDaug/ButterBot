@@ -6,7 +6,7 @@ import pickle
 
 client = discord.Client()
 
-VERSION = '1.0.5'
+VERSION = '1.0.6'
 
 qwk_help = """For more specific help type help [topic].
 Topics are :
@@ -114,8 +114,8 @@ async def on_message(message):
                 await client.send_message(message.channel, qwk_help)
         elif 'version' in message.content.lower():
             await client.send_message(message.channel, VERSION)
-    elif '.r' == sp[0]:
-        await client.send_message(message.channel, rolling.roll(sp[1:]))
+    elif message.content.startswith('.r '):
+        await client.send_message(message.channel, rolling.roll(message.content[3:]))
     elif message.content.startswith('Create Vote'):
         if message.content.split("ID:")[1].split("Q:")[0].strip() in votes.votes:  # id
             await client.send_message(message.channel, "Vote already exists. To Overwrite, delete previous first.")

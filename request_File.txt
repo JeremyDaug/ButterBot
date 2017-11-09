@@ -1,2 +1,5 @@
 Mechanical_Marvel: add some sort of "test" command to butterbot (either for the lols or to see if everythings working in chat)
 Mechanical_Marvel: Also maybe a "say" command so we can make him do embarassing and self-referential things in chat
+PhantomOTL: Display results of roll alongside any mathematical operations done to it- e.g. 
+Input: ".r 1d20/10"
+Output: "(*9* ÷ 10) = 0
