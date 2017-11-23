@@ -3,9 +3,8 @@ A ledger program file to manage transactions and loot in games.
 
 Not strongly secure, do not depend on it.
 """
-from typing import List, Union, Mapping, Tuple
+from typing import Union, Mapping, Tuple, NewType
 from random import randint
-
 
 class Ledger:
     """Ledger class which contains and manages both currency and items."""
@@ -52,16 +51,17 @@ class Ledger:
         self.bank_lock = False
         return
 
-    def get_account(self, account: str) -> Union[int, None]:
+    def get_account(self, account: str):
         """Get's account by name.
 
         :param account: The account to retrieve
-        :return:
+        :return: The user we are looking for, None if it was not found.
+        :rtype: Account, None
         """
         if self.is_account_name(account):
             for i in range(len(self.users)):
                 if account == self.users[i].name:
-                    return i
+                    return self.users[i]
         else:
             return None
 
@@ -121,7 +121,7 @@ class Ledger:
                 [Account] gives [Account]: [Value], [Items...]
                 [Account] takes from Pot: [Value], [Items...]
                 [Account] sells [Items...]
-                [Account] buys [Items...] for [Values...]
+                [Account] buys [Items...]
                 [Account] Balance
                 Bank gives [Account]: [Value], [Items...]
                 Bank takes from [Account]: [Value], [Items...]
@@ -134,6 +134,7 @@ class Ledger:
         """
         giver = ""
         taker = ""
+        action = ""
         value = ""
         items = ""
         # special op, while it doesn't move anything around, it is still
@@ -142,67 +143,115 @@ class Ledger:
             return self.set_value(command, key)
 
         words = command.split(" ")
+        # giver
         giver = words[0]
         if giver != 'Bank' and not self.is_account_name(giver):
             return 'Account does not exist.\n'
-        # TODO finish ^ and gut v
-        if command.startswith("Bank gives"):
-            giver = 'Bank'
-            taker = command.lstrip('Bank gives ').split(':', 1)[0]
-            inputs = command.split(":", 1)[1].split(',', 1)
-            if len(inputs) == 1:
-                if ':' in inputs[0]:
-                    items = inputs[0]
-                else:
-                    value = float(inputs[0])
-            elif ':' in inputs[0]:
+        # taker
+        if words[1] == 'gives':
+            taker = words[2]
+            action = 'give'
+        elif words[1] == 'takes' and words[2] == 'from':
+            taker = words[3]
+            action = 'take'
+        elif words[1] == 'Balance':
+            return self.show_balance(giver)
+        elif words[1] == ['buys', 'sells']:
+            taker = 'Store'
+            action = words[1][:-1]
+        else:
+            return 'Command not Recognized.\n'
+        if ':' in taker:
+            taker = taker.replace(':', '')
+        if taker not in ['Bank', 'Pot'] and not self.is_account_name(taker):
+            return "Account does not exist.\n"
+        # inputs
+        inputs = ""
+        if action in ['give', 'take']:
+            inputs = command.split(':', 1)[1]
+        elif action in ['buy', 'sell']:
+            inputs = command.split(" ", 2)[2]
+        inputs = inputs.split(',')
+        # value
+        if len(inputs) == 1:
+            if ':' in inputs[0]:
+                items = inputs
                 value = 0
-                items = command.split(":", 1)[1]
             else:
                 value = float(inputs[0])
-                items = inputs[1]
+                items = {}
+        elif ':' not in inputs[0]:
+            value = float(inputs[0])
+            items = inputs[1:]
+        else:
+            value = 0
+            items = inputs
+        # items
+        items_fin = {}
+        for item in items:
+            if not item:  # if empty, ignore
+                continue
+            if ':' not in item:
+                return "Item must be in [Item]:[Amount] format.\n"
+            name, amount = item.split(':')
+            items_fin[name.strip()] = int(amount)
+        if giver == 'Bank':
             if self.bank.key != key:
                 return "Invalid Key.\n"
-            if not self.is_account_name(taker):
-                return "Account does not exist.\n"
-            # value
-            if ':' in value:
-                value = 0
-            else:
-                value = float(value)
-            # items
-            for pair in items.split(','):
-                if not pair:
-                    continue
-                elif value and pair == inputs.split(',')[0]:
-                    continue
-                if ':' not in pair:
-                    return "Item must be in [Item]:[Amount].\n"
-                item, amount = pair.split(':')
-                items[item.strip()] = int(amount)
-            self.history.append(command)
-            ret = self.users[self.get_account(taker)].add(value=value, items=items)
-            for item in items:
+            if action == 'give':
+                # bank can give items with no value and does not lose anything when
+                # it gives
+                for item in items:
+                    if item not in self.library.library:
+                        self.library.new_item(item)
+                ret = self.get_account(taker).add(value=value, items=items_fin)
+            elif action == 'take':
+                # bank can take without reservation.
+                ret = self.get_account(taker).take(value=value, items=items_fin)
+        elif taker == 'Store':
+            dne = ''
+            unvalued = ''
+            priceless = ''
+            ret = ''
+            for item in items_fin:
                 if item not in self.library.library:
-                    self.library.new_item(item)
-            return ret
-        elif command.startswith("Bank takes from"):
-           return self.bank_takes(command, key)
-        if self.is_account_name(command.split(" ", 1)[0]):
-            if words[1] == 'gives':
-               return self.give_action(command, key)
-            elif words[1] == 'takes':
-               return self.take_action(command, key)
-            elif words[1] == 'sells':
-               return self.sell_items(command, key)
-            elif words[1] == 'buys':
-               return self.buy_items(command, key)
-            elif words[1] == 'Balance':
-                return self.show_balance(words[1], key)
-            else:
-                return 'Command Not found.\n'
+                    dne += "%s," % item
+                elif self.library.library[item] == -1:
+                    unvalued += "%s," % item
+                elif self.library.library[item] == -2:
+                    priceless += "%s," % item
+            if dne:
+               ret += "Items don't exist: %s.\n" % dne
+            if unvalued:
+                ret += "Items currently unvalued: %s.\n" % unvalued
+            if priceless:
+                ret += "Priceless Items: %s.\n" % priceless
+            if ret:
+                return ret
+            price = 0
+            if action == 'buy':
+                price = sum([amount*self.library.library[name] for name, amount in items_fin.items()])
+                ret = self.get_account(giver).remove(value=price, key=key)
+                if not ret:
+                    ret = self.get_account(giver).add(items=items_fin)
+                if ret:
+                    return ret
+            elif action == 'sell':
+                price = sum([amount*self.library.library[name] for name, amount in items_fin.items()])
+                ret = self.get_account(giver).remove(items=items_fin)
+                if not ret:
+                    ret = self.get_account(giver).add(value=price)
+                if ret:
+                    return ret
+            self.history.append(command + " for %d." % price)
+        elif taker == 'Pot':
+            value = value
         else:
-            return "Account does not exist.\n"
+            ret = self.users[self.get_account(taker)].add(value=value, items=items)
+        for item in items:
+            if item not in self.library.library:
+                self.library.new_item(item)
+        return ret
 
     def parse_item_list(self, items: str) -> bool:
         """ Parses a string of items into a dict.

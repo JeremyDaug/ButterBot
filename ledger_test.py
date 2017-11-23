@@ -235,11 +235,11 @@ class TestLedger(unittest.TestCase):
             self.ledger.transaction("Bank gives TestAccount: VAT:1",
                                     'TestKey'),
             "")
-        print(self.ledger.users[self.ledger.get_account(
-                'TestAccount')].inventory)
+        print(self.ledger.get_account(
+                'TestAccount').inventory)
         self.assertTrue(
-            'VAT' in self.ledger.users[self.ledger.get_account(
-                'TestAccount')].inventory)
+            'VAT' in self.ledger.get_account(
+                'TestAccount').inventory)
         self.assertEqual(self.ledger.users[-1].inventory['VAT'], 1)
 
     def test_bank_gives_items(self):
@@ -270,25 +270,28 @@ class TestLedger(unittest.TestCase):
             self.ledger.transaction("Bank gives TestAccount: -100", 'TestKey'),
             "Value cannot be negative.\n")
 
-    def test_bank_gives_negative_item(self):
+    def test_transaction_negative_item(self):
         self.assertEqual(self.ledger.transaction(
             "Bank gives TestAccount: Item1:-1",
             'TestKey'),
             "Cannot add a negative number of Item1 to inventory.\n")
 
-    def test_bank_gives_bad_account(self):
+    def test_transaction_bad_account(self):
         self.assertEqual(self.ledger.transaction("Bank gives Test: 100",
                                                  'TestKey'),
                          "Account does not exist.\n")
+        self.assertEqual(self.ledger.transaction("Test gives Bank: 100",
+                                                 'TestKey'),
+                         "Account does not exist.\n")
 
-    def test_bank_gives_bad_syntax(self):
+    def test_transaction_syntax(self):
         self.assertEqual(self.ledger.transaction(
             "Bank gives TestAccount: 100, 50", 'TestKey'),
-                         "Item must be in [Item]:[Amount].\n")
+                         "Item must be in [Item]:[Amount] format.\n")
 
-    def test_bank_invalid_key(self):
+    def test_transaction_bank_invalid_key(self):
         self.assertEqual(
-            self.ledger.transaction("Bank gives TestAccount: 100, 50", 'Key'),
+            self.ledger.transaction("Bank gives TestAccount: 100", 'Key'),
             "Invalid Key.\n")
 
 
