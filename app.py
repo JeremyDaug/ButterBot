@@ -3,6 +3,7 @@ import asyncio
 import rolling
 import voting
 import pickle
+from ledger import Ledger
 
 client = discord.Client()
 
@@ -72,6 +73,8 @@ It will save them so that My Creator can act on them later.
 Thank you for the request."""
 
 votes = voting.voting()
+da_books = {}
+
 
 @client.event
 async def on_ready():
