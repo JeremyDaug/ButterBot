@@ -4,7 +4,9 @@ A ledger program file to manage transactions and loot in games.
 Not strongly secure, do not depend on it.
 """
 from typing import Union, Mapping, Tuple, NewType
-from random import randint
+from item import Items
+from account import Account
+
 
 class Ledger:
     """Ledger class which contains and manages both currency and items."""
@@ -51,13 +53,24 @@ class Ledger:
         self.bank_lock = False
         return
 
-    def get_account(self, account: str):
+    def new_item(self, name: str, value: float=-1) -> bool:
+        """
+        Helper function, calls Item.New_item()
+        :param name: The Name of the new item.
+        :param value: The value of the item.
+        :return: True if successful (item does not exist already).
+        """
+        return self.library.new_item(name=name, value=value)
+
+    def get_account(self, account: str) -> Union[Account, None]:
         """Get's account by name.
 
         :param account: The account to retrieve
         :return: The user we are looking for, None if it was not found.
         :rtype: Account, None
         """
+        if account == "Pot":
+            return self.pot
         if self.is_account_name(account):
             for i in range(len(self.users)):
                 if account == self.users[i].name:
@@ -109,6 +122,8 @@ class Ledger:
         :param name: The name of the account to check.
         :return: True if there, false otherwise.
         """
+        if name in ['Pot', 'Bank', 'Store']:
+            return True
         return name in [user.name for user in self.users]
 
     def transaction(self, command: str, key: str) -> str:
@@ -122,7 +137,6 @@ class Ledger:
                 [Account] takes from Pot: [Value], [Items...]
                 [Account] sells [Items...]
                 [Account] buys [Items...]
-                [Account] Balance
                 Bank gives [Account]: [Value], [Items...]
                 Bank takes from [Account]: [Value], [Items...]
                 ---- Special Operation ---
@@ -132,20 +146,27 @@ class Ledger:
         :return: A string of success or failure, if failure
         error will be given.
         """
+        if self.transaction_lock:
+            return 'Transactions locked.\n'
         giver = ""
         taker = ""
         action = ""
         value = ""
         items = ""
+        ret = ''
         # special op, while it doesn't move anything around, it is still
         # recorded and so put here.
         if command.startswith("Set Value"):
             return self.set_value(command, key)
 
         words = command.split(" ")
+        print(words)
+        if len(words) < 3:
+            return 'Command not Recognized.\n'
         # giver
         giver = words[0]
         if giver != 'Bank' and not self.is_account_name(giver):
+            print('Giver DNE.')
             return 'Account does not exist.\n'
         # taker
         if words[1] == 'gives':
@@ -154,16 +175,15 @@ class Ledger:
         elif words[1] == 'takes' and words[2] == 'from':
             taker = words[3]
             action = 'take'
-        elif words[1] == 'Balance':
-            return self.show_balance(giver)
-        elif words[1] == ['buys', 'sells']:
+        elif words[1] in ['buys', 'sells']:
             taker = 'Store'
             action = words[1][:-1]
         else:
             return 'Command not Recognized.\n'
         if ':' in taker:
             taker = taker.replace(':', '')
-        if taker not in ['Bank', 'Pot'] and not self.is_account_name(taker):
+        if taker not in ['Bank', 'Pot', 'Store'] and not self.is_account_name(taker):
+            print('Taker DNE')
             return "Account does not exist.\n"
         # inputs
         inputs = ""
@@ -196,6 +216,8 @@ class Ledger:
             name, amount = item.split(':')
             items_fin[name.strip()] = int(amount)
         if giver == 'Bank':
+            if self.bank_lock:
+                return 'Bank Locked.\n'
             if self.bank.key != key:
                 return "Invalid Key.\n"
             if action == 'give':
@@ -209,6 +231,8 @@ class Ledger:
                 # bank can take without reservation.
                 ret = self.get_account(taker).take(value=value, items=items_fin)
         elif taker == 'Store':
+            if self.store_lock:
+                return "Store Locked.\n"
             dne = ''
             unvalued = ''
             priceless = ''
@@ -231,42 +255,108 @@ class Ledger:
             price = 0
             if action == 'buy':
                 price = sum([amount*self.library.library[name] for name, amount in items_fin.items()])
-                ret = self.get_account(giver).remove(value=price, key=key)
+                ret = self.get_account(giver).remove(key=key, value=price)
                 if not ret:
                     ret = self.get_account(giver).add(items=items_fin)
                 if ret:
                     return ret
             elif action == 'sell':
                 price = sum([amount*self.library.library[name] for name, amount in items_fin.items()])
-                ret = self.get_account(giver).remove(items=items_fin)
+                ret = self.get_account(giver).remove(items=items_fin, key=key)
                 if not ret:
                     ret = self.get_account(giver).add(value=price)
                 if ret:
                     return ret
             self.history.append(command + " for %d." % price)
         elif taker == 'Pot':
-            value = value
+            if action == 'give':
+                print('Give to Pot')
+                ret = self.get_account(giver).remove(value=value, items=items_fin, key=key)
+                if not ret:
+                    ret = self.pot.add(value=value, items=items_fin)
+                if ret:
+                    return ret
+                self.history.append(command)
+            elif action == 'take':
+                print('Take from Pot')
+                ret = self.pot.remove(value=value, items=items_fin, key="")
+                if not ret:
+                    ret = self.get_account(giver).add(value=value, items=items_fin)
+                if ret:
+                    return ret
+                self.history.append(command)
         else:
-            ret = self.users[self.get_account(taker)].add(value=value, items=items)
-        for item in items:
-            if item not in self.library.library:
-                self.library.new_item(item)
+            ret = self.get_account(giver).remove(value=value, items=items_fin, key=key)
+            if not ret:
+                ret = self.get_account(taker).add(value=value, items=items_fin)
+            if ret:
+                return ret
+            self.history.append(command)
         return ret
 
-    def parse_item_list(self, items: str) -> bool:
-        """ Parses a string of items into a dict.
-        :param items: The item string to parse.
-                Format: [Item Name]:[Item count] [, Next item]
-        :return: True if successful, False otherwise.
+    def show_balance(self, account: str) -> Tuple[float, Mapping[str, int], float, str]:
+        """Shows the balance of an account.
+        Value and all items, and the total value including items.
+
+        :param account: The account to retrieve
+        :param key: The key of the account
+        :return: A string of the balance.
         """
+        if not self.is_account_name(account):
+            return 0, {}, 0, "Account does not exist.\n"
+        value = self.get_account(account=account).value
+        items = self.get_account(account=account).inventory
+        total_value = float(value) + sum([amount*self.library.library[item] if self.library.library[item] >= 0 else 0
+                                          for item, amount in items.items()])
+        items_str = ''
+        for item, amount in items.items():
+            items_str += '%s:%d,' % (item, amount)
+        return value, items, total_value, "%s has %d and %s for a total value of %d.\n" % (account, value, items_str, total_value)
 
-        return
+    def total_value(self) -> Tuple[float, Mapping[str, int], float, str]:
+        """Retrieves the total value of the pot and all users combined.
 
-    def total_value(self):
-        pass
+        :return: Returns the value, all items in a single dict, total value,
+         and a string form of this info.
+        """
+        value = 0
+        coll_items = {}
+        for user in self.users:
+            value += user.value
+            for item, amount in user.inventory.items():
+                if item in coll_items:
+                    coll_items[item] += amount
+                else:
+                    coll_items[item] = amount
+        # do the same for the pot.
+        value += self.pot.value
+        for item, amount in self.pot.inventory.items():
+            if item in coll_items:
+                coll_items[item] += amount
+            else:
+                coll_items[item] = amount
 
-    def show_rectify(self):
-        pass
+        total_value = value + sum([amount*self.library.library[item] if self.library.library[item] >= 0 else 0
+                                   for item, amount in coll_items.items()])
+        items_str = ''
+        for item, amount in coll_items.items():
+            items_str += '%s:%d, ' % (item, amount)
+        items_str = items_str[:-2]
+        ret = 'Everyone together holds %d and %s for a total value of %d.\n' % (value, items_str, total_value)
+        return value, coll_items, total_value, ret
+
+    def show_rectify(self) -> str:
+        """Shows the current value difference between all users and the average.
+
+        This currently only works in value and makes no suggestions on items.
+
+        :return: Each user and the total value they need to reach the average.
+        """
+        ret = ''
+        ave_value = self.total_value()[2]/len(self.users)
+        for user in self.users:
+            ret += '%s: %d\n' % (user.name, ave_value-self.show_balance(user.name)[2])
+        return ret
 
     def save(self) -> None:
         """ Save function. Can be called as needed, guaranteed to be called on
@@ -281,10 +371,7 @@ class Ledger:
             for i in self.users:
                 file.write(i.save_data()+'\n')
             file.write("\n\n")
-            # second is tha values of any items that exist. If it's value is
-            # not found then the item is currently unvalued.
-            file.write(self.library.save_data() + "\n")
-            file.write('\n\n')
+            # we save the items separately from our transactions and users.
             # last we write the full transaction history.
             file.write(self.transaction_log())
         # save our smaller data to a config file.
@@ -292,6 +379,7 @@ class Ledger:
             file.write(str(self.user_lock) + "\n" + str(self.transaction_lock)
                        + "\n" + str(self.store_lock) + "\n"
                        + str(self.bank_lock))
+        self.library.save_data(self.save_location)
         return
 
     def load_config(self) -> None:
@@ -316,9 +404,8 @@ class Ledger:
         for line in lines[2:]:
             self.users.append(Account())
             self.users[-1].load_data(line)
-        self.library.load_data(sections[1])
         self.history = []
-        for line in sections[2].splitlines():
+        for line in sections[1].splitlines():
             self.history.append(line)
 
     def transaction_log(self, transactions=0):
@@ -333,218 +420,4 @@ class Ledger:
         else:
             for i in self.history:
                 ret += i + '\n'
-        return ret
-
-
-class Account:
-    """Account class, contains and checks that it is the user removing stuff
-    from it. It will contain raw numerical value and a list of items.
-
-    It checks against the key to see if the user is who they say they are.
-    """
-    def __init__(self, owner: str = "", name: str = "", key: str = "",
-                 value: float = 0,
-                 inventory: Union[Mapping[str, int], None] = None):
-        # Who owns this account
-        self.owner = owner
-        # The name of the account
-        self.name = name
-        # The key they check against.
-        self.key = key
-        # Raw value contained in whatever currency is being used.
-        self.value = value
-        # Unliquidated items owned. A map of inventory[Name]->amount.
-        if inventory is None:
-            inventory = dict()
-        self.inventory = inventory
-        return
-
-    def save_data(self) -> str:
-        """Takes the account and puts in into a form that can be saved.
-
-        :return: A string of it's data.
-        """
-        ret = self.owner + "\t" + self.name + "\t" + self.key + "\t"
-        ret += str(self.value) + "\t" + self.item_list()
-        return ret
-
-    def load_data(self, line: str) -> None:
-        """Load data function, no check, if it don't work it's because it's
-        broken.
-
-        :param line: The line to parse and load from.
-        """
-        data = line.split('\t')
-        self.owner = data[0]
-        self.name = data[1]
-        self.key = data[2]
-        self.value = float(data[3])
-        items = data[4]
-        for item in items.split(','):
-            name, amount = item.split(':')
-            self.inventory[name] = float(amount)
-        return
-
-    def item_list(self) -> str:
-        """
-        Returns the list of items in a string. Items are separated by commas.
-
-        :return: The string of the account's items listed.
-        """
-        ret = ''
-        for item, amount in self.inventory.items():
-            ret += "%s:%d," % (item, amount)
-        return ret[:-1]
-
-    def add(self, value: float=0, items: Mapping[str, int]=None) -> str:
-        """Adds something to the account.
-
-        This will add something to the account and has no safety measures
-        because who doesn't like free stuff?
-
-        .. warning:: Item's existence cannot be checked here, must be checked
-        beforehand.
-
-        :param value: What is being added to the value. Must be >0
-        :param items: What Items are being added to their list.
-                Amount must be >0
-        :return: Returns an empty string if successful, what went wrong
-        otherwise.
-        """
-        if not value and items is None:  # sanity check
-            return "Nothing given.\n"
-        if value < 0:  # if negative value
-            return "Value cannot be negative.\n"
-        else:
-            self.value += value
-        if items is None:
-            return ""
-        for item, amount in items.items():
-            if amount < 1:
-                return "Cannot add a negative number of %s to inventory.\n" %\
-                       item
-        for item, amount in items.items():
-            if item in self.inventory:
-                self.inventory[item] += amount
-            else:
-                self.inventory[item] = amount
-        return ""
-
-    def remove(self, key: str, value: float, items: Mapping[str, int]) -> str:
-        """
-        Remove something from the account.
-
-        Checks for validity of removal and then follows through to the best of
-        it's abilities.
-
-        :param key: The key to check for security.
-        :param value: How much currency is being removed.
-        :param items: What items and how many of them to remove.
-        :return: Any errors or problems that were run into.
-        """
-        if key != self.key or self.key == "":
-            return "Invalid Key, you are not %s.\n" % self.name
-        return self.take(value, items)
-
-    def take(self, value: float=0, items: Mapping[str, int] = None) -> str:
-        """
-        Take from the account what has been passed in.
-
-        :param value: How much currency to remove.
-        :param items: A dict of items to be removed and how many of each.
-        :return: If ANYTHING goes wrong it will return a non-empty string.
-        """
-        if not value and not items:
-            return "Nothing Passed. Try again.\n"
-        if value < 0:
-            return "You cannot remove a negative number!\n"
-        elif value > self.value:
-            return "You don't have enough money.\n"
-        if items is not None:
-            for item, amount in items.items():
-                if item not in self.inventory:
-                    return "You don't have any %s(s).\n" % item
-                elif self.inventory[item] < amount:
-                    return "You don't have enough %s(s).\n" % item
-                elif amount < 1:
-                    return "You cannot remove less than 1 item from an " \
-                           "Inventory.\n"
-            for item, amount in items.items():
-                self.inventory[item] -= amount
-                if self.inventory[item] == 0:
-                    self.inventory.pop(item)
-        self.value -= value
-        return ""
-
-    def balance(self) -> Tuple[float, str]:
-        """Balance checking formula, returns everything owned by the account.
-
-        :return: Returns a tuple containing the value of the account and all
-        items.
-        """
-        return self.value, self.item_list()
-
-
-class Items:
-    """The Library of all items that currently exist.
-
-    Contains all our items, names for items should be unique at all times.
-
-    Dict contains name (str) and Value (float) pairs.
-    """
-    def __init__(self) -> None:
-        self.library = dict()
-        return
-
-    def new_item(self, name: str, value: float = -1) -> bool:
-        """Add an item to the library.
-
-        :param name: Name of the item, must be unique.
-        :param value: Value of the item. -1 means it has not been valued.
-                      -2 means it is priceless.
-        :return: True if item was added, false otherwise.
-        """
-        if name in self.library.keys():
-            return False
-        self.library[name] = value
-        return True
-
-    def change_value(self, name: str, new_value: float) -> bool:
-        """Alters the value of an item.
-
-        There is no safety on this and should only be called when you are
-        certain that it can be called in it's current context
-
-        :param name: Name of the item to replace.
-        :param new_value: The value we are changing the item to.
-        :return: True if successful, false otherwise (Item does not exist).
-        """
-        if name in self.library:
-            self.library[name] = new_value
-            return True
-        return False
-
-    def save_data(self) -> str:
-        """Turns the item into a string for saving.
-        :return: the string of the item's data.
-        """
-        ret = ''
-        for name, value in self.library.items():
-            ret += "%s\t%d\n" % (name, value)
-        return ret[:-1]
-
-    def load_data(self, lines: str) -> str:
-        """Turns the lines given into data.
-
-        :param lines: the lines to load, must be in [item name]\t[item value]
-                     format.
-        :return: returns any failed lines
-        """
-        ret = ''
-        for line in lines.splitlines():
-            if '\t' not in line:
-                ret += line + '\n'
-            else:
-                name, value = line.split('\t')
-                self.library[name] = float(value)
         return ret

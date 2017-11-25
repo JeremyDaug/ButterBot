@@ -177,6 +177,7 @@ class TestLedger(unittest.TestCase):
     def setUp(self):
         self.ledger = ledger.Ledger("Test", "Test", "TestAdmin", "TestKey",
                                     "TestStoreKey")
+        self.ledger.library.new_item('Test', 100)
         self.ledger.add_user("TestUser", "TestAccount",
                              "TestUserKey", 100, {'Test': 1})
 
@@ -223,7 +224,7 @@ class TestLedger(unittest.TestCase):
     def test_is_account_name_false(self):
         self.assertFalse(self.ledger.is_account_name("DNE"))
 
-    def test_bank_gives_value(self):
+    def test_transaction_bank_gives_value(self):
         self.assertEqual(
             self.ledger.transaction("Bank gives TestAccount: 100",
                                     'TestKey'),
@@ -255,9 +256,9 @@ class TestLedger(unittest.TestCase):
         self.assertEqual(self.ledger.users[-1].inventory['Item9'], 10)
 
     def test_bank_gives_value_and_items(self):
-        self.assertEquals(
+        self.assertEqual(
             self.ledger.transaction(
-                "Bank gives TestAccount: 100, Item1:1, Item2: 4,",
+                "Bank gives TestAccount: 100,Item1:1,Item2:  4,",
                 'TestKey'), "")
         self.assertEqual(
             self.ledger.users[-1].value, 200
@@ -293,6 +294,206 @@ class TestLedger(unittest.TestCase):
         self.assertEqual(
             self.ledger.transaction("Bank gives TestAccount: 100", 'Key'),
             "Invalid Key.\n")
+
+    def test_store_buy_item(self):
+        self.ledger.library.new_item('Test1', 100)
+        self.assertEqual(
+            self.ledger.transaction("TestAccount buys Test1:1", 'TestUserKey'),
+            "")
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').inventory['Test1'], 1
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').value, 0
+        )
+
+    def test_store_sell_item(self):
+        self.ledger.new_item('Test1', 100)
+        print(self.ledger.transaction("Bank gives TestAccount: Test1:2", 'TestKey'))
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').inventory["Test1"],
+            2
+        )
+        self.assertEqual(
+            self.ledger.transaction("TestAccount sells Test1:1", 'TestUserKey'),
+            ""
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').value,
+            200
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').inventory['Test1'],
+            1
+        )
+
+    def test_store_locked(self):
+        self.ledger.store_lock = True
+        self.assertEqual(
+            self.ledger.transaction('TestAccount sells Test:1', 'TestUserKey'),
+            'Store Locked.\n'
+        )
+
+    def test_bank_gives_pot(self):
+        self.assertEqual(
+            self.ledger.transaction("Bank gives Pot: 100", 'TestKey'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.get_account('Pot').value,
+            100
+        )
+        self.ledger.new_item('Test1', 100)
+        self.assertEqual(
+            self.ledger.transaction("Bank gives Pot: Test1:1", 'TestKey'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.get_account('Pot').inventory['Test1'],
+            1
+        )
+
+    def test_give_pot(self):
+        self.assertEqual(
+            self.ledger.transaction('TestAccount gives Pot: 100, Test:1', 'TestUserKey'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').value,
+            0
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').inventory,
+            {}
+        )
+        self.assertEqual(
+            self.ledger.get_account('Pot').value,
+            100
+        )
+        self.assertEqual(
+            self.ledger.get_account('Pot').inventory['Test'],
+            1
+        )
+
+    def test_take_pot(self):
+        self.assertEqual(
+            self.ledger.transaction('Bank gives Pot: 100, Test:1', 'TestKey'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.get_account('Pot').value,
+            100
+        )
+        self.assertEqual(
+            self.ledger.get_account('Pot').inventory['Test'],
+            1
+        )
+        self.assertEqual(
+            self.ledger.transaction('TestAccount takes from Pot: 100, Test:1', 'TestUserAccount'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.get_account('Pot').value,
+            0
+        )
+        self.assertEqual(
+            self.ledger.get_account('Pot').inventory,
+            {}
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').value,
+            200
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').inventory['Test'],
+            2
+        )
+
+    def test_account_gives_account(self):
+        self.assertEqual(
+            self.ledger.add_user("TestUser2", 'TestAccount2', 'TestUserKey2',
+                                 100, {'Test': 1}),
+            (True, 'TestAccount2 account added.\n')
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount2').value,
+            100
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount2').inventory['Test'],
+            1
+        )
+        self.assertEqual(
+            self.ledger.transaction('TestAccount gives TestAccount2: 100, Test:1', 'TestUserKey'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').value,
+            0
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount').inventory,
+            {}
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount2').value,
+            200
+        )
+        self.assertEqual(
+            self.ledger.get_account('TestAccount2').inventory['Test'],
+            2
+        )
+
+    def test_show_balance(self):
+        self.assertEqual(
+            self.ledger.show_balance('TestAccount'),
+            (100, {'Test': 1}, 200, 'TestAccount has 100 and Test:1, for a total value of 200.\n')
+        )
+        self.assertEqual(
+            self.ledger.transaction('Bank gives TestAccount: 100', 'TestKey'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.show_balance('TestAccount'),
+            (200, {'Test': 1}, 300, 'TestAccount has 200 and Test:1, for a total value of 300.\n')
+        )
+
+    def test_show_pot_balance(self):
+        self.assertEqual(
+            self.ledger.transaction('Bank gives Pot: 100, Test:1', 'TestKey'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.show_balance('Pot'),
+            (100, {'Test': 1}, 200, 'Pot has 100 and Test:1, for a total value of 200.\n')
+        )
+
+    def test_show_balance_invalid_account(self):
+        self.assertEqual(
+            self.ledger.show_balance('DNEAccount')[-1],
+            'Account does not exist.\n'
+        )
+
+    def test_show_total_value(self):
+        self.assertEqual(
+            self.ledger.total_value(),
+            (100, {'Test': 1}, 200,
+             'Everyone together holds 100 and Test:1 for a total value of 200.\n')
+        )
+
+    def test_show_rectify(self):
+        self.assertEqual(
+            self.ledger.show_rectify(),
+            "TestAccount: 0\n"
+        )
+        self.assertEqual(
+            self.ledger.transaction('Bank gives Pot: 100', 'TestKey'),
+            ''
+        )
+        self.assertEqual(
+            self.ledger.show_rectify(),
+            'TestAccount: 100\n'
+        )
 
 
 if __name__ == '__main__':
