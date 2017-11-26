@@ -34,7 +34,7 @@ class Account:
 
         :return: A string of it's data.
         """
-        ret = self.owner + "\t" + self.name + "\t" + self.key + "\t"
+        ret = self.owner + "\t" + self.name + "\t" + str(self.key) + "\t"
         ret += str(self.value) + "\t" + self.item_list()
         return ret
 
@@ -50,6 +50,8 @@ class Account:
         self.key = data[2]
         self.value = float(data[3])
         items = data[4]
+        if not items:
+            return
         for item in items.split(','):
             name, amount = item.split(':')
             self.inventory[name] = float(amount)

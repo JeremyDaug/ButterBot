@@ -44,6 +44,17 @@ class Items:
             return True
         return False
 
+    def delete_item(self, name: str) -> bool:
+        """Delete item function. Deletes item of the name given.
+
+        :param name: The name of the item to delete.
+        :return: True if successful (IE it existed and is now gone).
+        """
+        if name not in self.library:
+            return False
+        self.library.pop(name)
+        return True
+
     def set_save_location(self, location) -> None:
         """Sets the save location of the library.
 
@@ -60,7 +71,7 @@ class Items:
         :return: the string of the item's data.
         """
         if not self.save_location:
-            return 'Save Location Not set.'
+            return 'Save Location Not Set.\n'
         data = ''
         for name, value in self.library.items():
             data += "%s,%d,\n" % (name, value)
@@ -68,14 +79,19 @@ class Items:
             file.write(data)
         return
 
-    def load_data(self) -> str:
+    def load_data(self) -> Optional[str]:
         """Turns the lines given into data.
 
         :return: returns any failed lines
         """
         if not self.save_location:
-            return "Library not yet saved."
-        ret = ''
+            return "Save Location Not Set.\n"
         with open(self.save_location) as file:
-            pass
-        return ret
+            lines = file.readlines()
+            for line in lines:
+                data = line.split(',')
+                if len(data) != 3:
+                    return "Something really broke in here. " \
+                           "You should check it out."
+                self.library[data[0]] = int(data[1])
+        return

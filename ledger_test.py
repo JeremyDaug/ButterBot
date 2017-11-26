@@ -1,10 +1,12 @@
 import unittest
 import ledger
+from item import Items
 
 
 class TestItems(unittest.TestCase):
     def setUp(self):
         self.library = ledger.Items()
+        self.library.set_save_location('save_TestServer_TestName.sav')
         self.library.new_item('Normal', 1)
         self.library.new_item('Unvalued', -1)
         self.library.new_item('Priceless', -2)
@@ -23,29 +25,27 @@ class TestItems(unittest.TestCase):
         self.assertFalse(self.library.change_value('DNE', 2))
 
     def test_save_data(self):
-        save1 = self.library.save_data()
-        print('\n'+save1)
-        save2 = self.library.save_data()
-        print('\n'+save2+'\n')
-        self.assertTrue(save1, save2)
+        self.library.set_save_location("save_TestServer_TestName.sav")
+        self.library.save_data()
+        new_lib = Items()
+        new_lib.set_save_location("save_TestServer_TestName.sav")
+        new_lib.load_data()
+        self.assertTrue(self.library.library == new_lib.library)
 
     def test_load_data(self):
-        save = self.library.save_data()
-        with open('Item_test.sav', 'w') as file:
-            file.write(save)
-
-        new_lib = ledger.Items()
-        with open('Item_test.sav', 'r') as file:
-            load = file.read()
-            new_lib.load_data(load)
-            print('\n'+load)
-            print(new_lib.save_data())
-
-        for item, value in new_lib.library.items():
-            with self.subTest(item):
-                self.assertTrue(item in self.library.library)
-            with self.subTest(value):
-                self.assertTrue(value == self.library.library[item])
+        with open('Items_TestServer_TestName.csv', 'w') as file:
+            file.write('Test1, 1,\nTest2,10,\nTest3,-1,\nTest4,-2,\n')
+        new_lib = Items()
+        new_lib.set_save_location('save_TestServer_TestName.sav')
+        new_lib.load_data()
+        self.assertTrue('Test1' in new_lib.library)
+        self.assertTrue('Test2' in new_lib.library)
+        self.assertTrue('Test3' in new_lib.library)
+        self.assertTrue('Test4' in new_lib.library)
+        self.assertTrue(new_lib.library['Test1'] == 1)
+        self.assertTrue(new_lib.library['Test2'] == 10)
+        self.assertTrue(new_lib.library['Test3'] == -1)
+        self.assertTrue(new_lib.library['Test4'] == -2)
 
     def test_load_data_fail(self):
         with open('Item_test.sav', 'w') as file:
@@ -56,7 +56,8 @@ class TestItems(unittest.TestCase):
         with open('Item_test.sav', 'r') as file:
             data = file.read()
             print(data)
-            self.assertIsNotNone(new_lib.load_data(data))
+            self.assertEqual(new_lib.load_data(),
+                             'Save Location Not Set.\n')
             print(new_lib.save_data())
 
 
@@ -493,6 +494,28 @@ class TestLedger(unittest.TestCase):
         self.assertEqual(
             self.ledger.show_rectify(),
             'TestAccount: 100\n'
+        )
+
+    def test_transaction_log(self):
+        self.ledger.transaction('Bank gives TestAccount1: 100', 'TestKey')
+        self.ledger.add_user("TestUser2", 'TestAccount2', 'TestUserKey2')
+        print(self.ledger.history)
+        print(self.ledger.transaction_log(1))
+
+    def test_save_and_load(self):
+        self.ledger.save()
+        data = ''
+        with open(self.ledger.save_location, 'r') as file:
+            data = file.read()
+        print(data)
+        self.ledger.users = []
+        self.assertEqual
+
+    def test_give_bank_item(self):
+        self.assertEqual(
+            self.ledger.transaction('TestAccount gives Bank: 100',
+                                    'TestUserKey'),
+            ''
         )
 
 

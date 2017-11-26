@@ -9,7 +9,44 @@ from account import Account
 
 
 class Ledger:
-    """Ledger class which contains and manages both currency and items."""
+    """Ledger class which contains and manages both currency and items.
+
+    All valid Commands to be accounted for.
+    -- handled in chatbot (creates class instance)
+    -+- Ledger [Ledger Name]
+
+    -- Handled by transaction
+    -+ [Account] gives [Account]: [Value], [Items...]
+    -+ [Account] buys [Items...]
+    -+ [Account] sells [Items...]
+    -+ [Account] takes from Pot: [Value], [Items...]
+    -+ Bank gives [Account]: [Value], [Items...]
+    -+ Bank takes from [Account]: [Value], [Items...]
+    -+- Set Value [Item]: [Value]
+
+    -- handled in chatbot and calls show_balance()
+    -+- [Account] Balance
+
+    -- handled in chatbot and calls add_user()
+    -+- Add Account [Account Name]
+
+    -- Handled in chatbot and calls show_rectify()
+    -+- Rectify
+
+    -- Handled in chatbot
+    -+- New Item [Item]: [Value]
+    -+- Delete Item [Item]
+    -+- Show History [Lines]
+    -+- Show Items
+    -+- Save
+    -+- Load
+    -+- Toggle User Lock
+    -+- Toggle Store Lock
+    -+- Toggle Bank Lock
+    -+- Toggle Transaction Lock
+
+    -+- Total Value
+    """
     def __init__(self, name: str, server: str, admin: str, key: str,
                  storekey: str) -> None:
         """
@@ -43,7 +80,7 @@ class Ledger:
         # The transaction ledger, what all was traded and in what order.
         self.history = []
         # The location it is saved to.
-        self.save_location = "save_%s_%s.sav" % (server, self.name)
+        self.save_location = "save_%s_%s.sav" % (self.location, self.name)
         # The Library of items as we know it.
         self.library = Items()
         # A number of locks to keep things under control.
@@ -61,6 +98,35 @@ class Ledger:
         :return: True if successful (item does not exist already).
         """
         return self.library.new_item(name=name, value=value)
+
+    def delete_item(self, name: str, key: str) -> bool:
+        """
+        A helper function to remove an item from the library.
+        Calls self.library.delete_item()
+
+        :param name: The item to be deleted.
+        :param key: The user's key to ensure it is the admin.
+        :return: True if successful, false if anything went wrong.
+        """
+        if key != self.bank.key:
+            return False
+        return self.library.delete_item(name)
+
+    def admin_new_item(self, key: str, name: str, value: float) -> bool:
+        """
+        A helper function to check it is the admin adding the item. Only used
+        externally.
+
+        :param key: The key of the user.
+        :param name: Name of the item.
+        :param value: Value of the item, defaults to unvalued (-1)
+        :return: True if item was added, false otherwise.
+        """
+        if key != self.bank.key:
+            return False
+        if value in [-1, -2] or value >= 0:
+            return self.new_item(name, value)
+        return False
 
     def get_account(self, account: str) -> Union[Account, None]:
         """Get's account by name.
@@ -126,6 +192,41 @@ class Ledger:
             return True
         return name in [user.name for user in self.users]
 
+    def item_list(self) -> str:
+        """Gets a list of all items and their current value.
+
+        :return: All the current items and their values.
+        """
+        ret = ''
+        for item, value in self.library.library.items():
+            ret += '%s: %d\n' % (item, value)
+        return ret
+
+    def set_value(self, command: str, key: str) -> str:
+        """ Sets the value of an item that already exists.
+
+        :param command: The command given by the user.
+        :param key: The key of the user to check against.
+        :return: A string of anything that happened and if it's successful.
+        """
+        data = command.lstrip('Set Value ')
+        item, value = data.split(':')
+        if item not in self.library.library:
+            return 'Item Not found.\n'
+        item = item.strip()
+        value = float(value.strip())
+        if self.library.library[item] == -1:
+            if value < 0:
+                return "Value must be non-negative."
+            self.library.change_value(item, value)
+        elif key == self.bank.key:
+            if value in [-1, -2] or value > 0:
+                self.library.change_value(item, value)
+            else:
+                return 'Value must be -1 for unvalued, -2 ' \
+                       'for priceless or non-negative.'
+        return "Value properly set."
+
     def transaction(self, command: str, key: str) -> str:
         """ Transaction function.
 
@@ -160,13 +261,11 @@ class Ledger:
             return self.set_value(command, key)
 
         words = command.split(" ")
-        print(words)
         if len(words) < 3:
             return 'Command not Recognized.\n'
         # giver
         giver = words[0]
         if giver != 'Bank' and not self.is_account_name(giver):
-            print('Giver DNE.')
             return 'Account does not exist.\n'
         # taker
         if words[1] == 'gives':
@@ -183,29 +282,33 @@ class Ledger:
         if ':' in taker:
             taker = taker.replace(':', '')
         if taker not in ['Bank', 'Pot', 'Store'] and not self.is_account_name(taker):
-            print('Taker DNE')
             return "Account does not exist.\n"
+        if giver == taker:
+            return "Cannot make a transaction with yourself.\n"
         # inputs
-        inputs = ""
-        if action in ['give', 'take']:
-            inputs = command.split(':', 1)[1]
-        elif action in ['buy', 'sell']:
-            inputs = command.split(" ", 2)[2]
-        inputs = inputs.split(',')
-        # value
-        if len(inputs) == 1:
-            if ':' in inputs[0]:
-                items = inputs
-                value = 0
-            else:
+        try:
+            inputs = ""
+            if action in ['give', 'take']:
+                inputs = command.split(':', 1)[1]
+            elif action in ['buy', 'sell']:
+                inputs = command.split(" ", 2)[2]
+            inputs = inputs.split(',')
+            # value
+            if len(inputs) == 1:
+                if ':' in inputs[0]:
+                    items = inputs
+                    value = 0
+                else:
+                    value = float(inputs[0])
+                    items = {}
+            elif ':' not in inputs[0]:
                 value = float(inputs[0])
-                items = {}
-        elif ':' not in inputs[0]:
-            value = float(inputs[0])
-            items = inputs[1:]
-        else:
-            value = 0
-            items = inputs
+                items = inputs[1:]
+            else:
+                value = 0
+                items = inputs
+        except IndexError:
+            return "Improper Syntax.\n"
         # items
         items_fin = {}
         for item in items:
@@ -230,6 +333,8 @@ class Ledger:
             elif action == 'take':
                 # bank can take without reservation.
                 ret = self.get_account(taker).take(value=value, items=items_fin)
+            self.history.append(command)
+            return ret
         elif taker == 'Store':
             if self.store_lock:
                 return "Store Locked.\n"
@@ -270,7 +375,6 @@ class Ledger:
             self.history.append(command + " for %d." % price)
         elif taker == 'Pot':
             if action == 'give':
-                print('Give to Pot')
                 ret = self.get_account(giver).remove(value=value, items=items_fin, key=key)
                 if not ret:
                     ret = self.pot.add(value=value, items=items_fin)
@@ -278,15 +382,23 @@ class Ledger:
                     return ret
                 self.history.append(command)
             elif action == 'take':
-                print('Take from Pot')
                 ret = self.pot.remove(value=value, items=items_fin, key="")
                 if not ret:
                     ret = self.get_account(giver).add(value=value, items=items_fin)
                 if ret:
                     return ret
                 self.history.append(command)
+        elif taker == 'Bank':
+            ret = self.get_account(giver).remove(value=value, items=items_fin,
+                                                 key=key)
+            if not ret:
+                ret = self.bank.add(value=value, items=items_fin)
+            if ret:
+                return ret
+            self.history.append(command)
         else:
-            ret = self.get_account(giver).remove(value=value, items=items_fin, key=key)
+            ret = self.get_account(giver).remove(value=value, items=items_fin,
+                                                 key=key)
             if not ret:
                 ret = self.get_account(taker).add(value=value, items=items_fin)
             if ret:
@@ -358,6 +470,34 @@ class Ledger:
             ret += '%s: %d\n' % (user.name, ave_value-self.show_balance(user.name)[2])
         return ret
 
+    def toggle_user_lock(self) -> None:
+        """
+        Lock user function.
+        """
+        self.user_lock = not self.user_lock
+        return
+
+    def toggle_transaction_lock(self) -> None:
+        """
+        Lock transactions.
+        """
+        self.transaction_lock = not self.transaction_lock
+        return
+
+    def toggle_stroe_lock(self) -> None:
+        """
+        Lock store function.
+        """
+        self.store_lock = not self.store_lock
+        return
+
+    def toggle_bank_lock(self) -> None:
+        """
+        Lock bank function.
+        """
+        self.bank_lock = not self.bank_lock
+        return
+
     def save(self) -> None:
         """ Save function. Can be called as needed, guaranteed to be called on
         close.
@@ -379,17 +519,18 @@ class Ledger:
             file.write(str(self.user_lock) + "\n" + str(self.transaction_lock)
                        + "\n" + str(self.store_lock) + "\n"
                        + str(self.bank_lock))
-        self.library.save_data(self.save_location)
+        self.library.set_save_location(self.save_location)
+        self.library.save_data()
         return
 
     def load_config(self) -> None:
         """Config loading file"""
         with open("config_"+self.save_location, 'r') as file:
             lines = file.readlines()
-            self.user_lock = bool(lines[0])
-            self.transaction_lock = bool(lines[1])
-            self.store_lock = bool(lines[2])
-            self.bank_lock = bool(lines[3])
+            self.user_lock = lines[0] == 'True'
+            self.transaction_lock = lines[1] == 'True'
+            self.store_lock = lines[2] == 'True'
+            self.bank_lock = lines[3] == 'True'
         return
 
     def load_save(self) -> None:
@@ -404,11 +545,13 @@ class Ledger:
         for line in lines[2:]:
             self.users.append(Account())
             self.users[-1].load_data(line)
+        self.library.set_save_location(self.save_location)
+        self.library.load_data()
         self.history = []
         for line in sections[1].splitlines():
             self.history.append(line)
 
-    def transaction_log(self, transactions=0):
+    def transaction_log(self, transactions: int=0) -> str:
         """Gets the history and returns it in readable format.
         :param int transactions: number of transactions to show, 0 shows all.
         :return: The history, delineated by newlines.
