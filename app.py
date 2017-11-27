@@ -7,7 +7,7 @@ from ledger import Ledger
 import string
 client = discord.Client()
 
-VERSION = '1.1.0'
+VERSION = '1.1.1'
 
 qwk_help = """For more specific help type help [topic].
 Topics are :
@@ -204,6 +204,7 @@ ledger_help_commands = """Condensed Commands:
 -- .t Total Value
 -- .t Save
 -- .t Load [Name]
+-- .t Show Accounts
 
 Non-implemented commands. 
 -- .t toggle [lock] lock
@@ -234,8 +235,8 @@ def log(*args):
 
 @client.event
 async def on_message(message):
-    if message.author.id != client.user.id:
-        await client.send_typing(message.channel)
+    # if message.author.id != client.user.id:
+    #     await client.send_typing(message.channel)
     log(message.author.name, message.channel, message.content)
     sp = message.content.split()
     if sp[0] == '<@{}>'.format(client.user.id):
@@ -333,6 +334,12 @@ async def on_message(message):
                 da_books[message.server].add_user(message.author.name, account,
                                                   message.author.id)[1]
             )
+            da_books[message.server].save()
+        elif command.startswith('Show Accounts'):
+            await client.send_message(
+                message.channel,
+                da_books[message.server].show_users()
+            )
         elif command.startswith('Show History'):
             if 'Show History' == command:
                 await client.send_message(
@@ -355,6 +362,7 @@ async def on_message(message):
             if da_books[message.server].admin_new_item(
                     message.author.id, item, value):
                 mess += 'Successfully Added %s.\n' % item
+                da_books[message.server].save()
             else:
                 mess += 'Item could not be added.\n'
             await client.send_message(
@@ -367,11 +375,13 @@ async def on_message(message):
                 da_books[message.server].transaction(command,
                                                      message.author.id)
             )
+            da_books[message.server].save()
         elif command.startswith('Delete Item '):
             item = command.lstrip('Delete Item ')
             mess = ''
             if da_books[message.server].delete_item(item, message.author.id):
                 mess += 'Item Successfully deleted.\n'
+                da_books[message.server].save()
             else:
                 mess += 'Item could not be deleted.\n'
             await client.send_message(
@@ -397,6 +407,7 @@ async def on_message(message):
                         message.channel,
                         'Transaction Complete.'
                     )
+                    da_books[message.server].save()
     elif message.content.startswith('Create Vote'):
         if message.content.split("ID:")[1].split("Q:")[0].strip() in votes.votes:  # id
             await client.send_message(message.channel, "Vote already exists. To Overwrite, delete previous first.")

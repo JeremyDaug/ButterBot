@@ -40,6 +40,7 @@ class Ledger:
     -+- Show Items
     -+- Save
     -+- Load
+    -+- Show Accounts
     -+- Toggle User Lock
     -+- Toggle Store Lock
     -+- Toggle Bank Lock
@@ -99,18 +100,18 @@ class Ledger:
         """
         return self.library.new_item(name=name, value=value)
 
-    def delete_item(self, name: str, key: str) -> bool:
-        """
-        A helper function to remove an item from the library.
-        Calls self.library.delete_item()
-
-        :param name: The item to be deleted.
-        :param key: The user's key to ensure it is the admin.
-        :return: True if successful, false if anything went wrong.
-        """
-        if key != self.bank.key:
-            return False
-        return self.library.delete_item(name)
+    # def delete_item(self, name: str, key: str) -> bool:
+    #     """
+    #     A helper function to remove an item from the library.
+    #     Calls self.library.delete_item()
+    #
+    #     :param name: The item to be deleted.
+    #     :param key: The user's key to ensure it is the admin.
+    #     :return: True if successful, false if anything went wrong.
+    #     """
+    #     if key != self.bank.key:
+    #         return False
+    #     return self.library.delete_item(name)
 
     def admin_new_item(self, key: str, name: str, value: float) -> bool:
         """
@@ -122,8 +123,6 @@ class Ledger:
         :param value: Value of the item, defaults to unvalued (-1)
         :return: True if item was added, false otherwise.
         """
-        if key != self.bank.key:
-            return False
         if value in [-1, -2] or value >= 0:
             return self.new_item(name, value)
         return False
@@ -150,6 +149,16 @@ class Ledger:
         """
         self.save()
         return
+
+    def show_users(self) -> str:
+        """ Returns string of all current accounts.
+
+        :return: All current accounts.
+        """
+        ret = ''
+        for user in self.users:
+            ret += user.name + '\n'
+        return ret
 
     def add_user(self, owner: str, name: str, key: str, value: float=0,
                  items: Mapping[str, int]=None) -> Tuple[bool, str]:
@@ -215,16 +224,17 @@ class Ledger:
             return 'Item Not found.\n'
         item = item.strip()
         value = float(value.strip())
-        if self.library.library[item] == -1:
-            if value < 0:
-                return "Value must be non-negative."
-            self.library.change_value(item, value)
-        elif key == self.bank.key:
+        if key == self.bank.key:
             if value in [-1, -2] or value > 0:
                 self.library.change_value(item, value)
             else:
                 return 'Value must be -1 for unvalued, -2 ' \
-                       'for priceless or non-negative.'
+                       'for priceless, or non-negative.'
+        elif self.library.library[item] == -1:
+            if value < 0:
+                return "Value must be non-negative."
+            self.library.change_value(item, value)
+        self.history.append(command)
         return "Value properly set."
 
     def transaction(self, command: str, key: str) -> str:
@@ -318,7 +328,7 @@ class Ledger:
                 return "Item must be in [Item]:[Amount] format.\n"
             name, amount = item.split(':')
             items_fin[name.strip()] = int(amount)
-        if giver == 'Bank':
+        if giver == 'Bank':  # Bank actions  ---------
             if self.bank_lock:
                 return 'Bank Locked.\n'
             if self.bank.key != key:
@@ -326,14 +336,15 @@ class Ledger:
             if action == 'give':
                 # bank can give items with no value and does not lose anything when
                 # it gives
-                for item in items:
+                for item in items_fin:
                     if item not in self.library.library:
                         self.library.new_item(item)
                 ret = self.get_account(taker).add(value=value, items=items_fin)
             elif action == 'take':
                 # bank can take without reservation.
                 ret = self.get_account(taker).take(value=value, items=items_fin)
-            self.history.append(command)
+            if not ret:
+                self.history.append(command)
             return ret
         elif taker == 'Store':
             if self.store_lock:

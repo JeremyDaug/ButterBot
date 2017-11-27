@@ -1,1 +1,2 @@
 Jakman217: Note to Self. Make it so the ledger saves after every valid transaction to ensure data is never lost.
+Mechanical_Marvel: You should remark upon how cold and fleeting existence is before shutting down.
