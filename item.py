@@ -26,6 +26,8 @@ class Items:
         """
         if name in self.library.keys():
             return False
+        if ',' in name:
+            return False
         self.library[name] = value
         return True
 
@@ -93,5 +95,5 @@ class Items:
                 if len(data) != 3:
                     return "Something really broke in here. " \
                            "You should check it out."
-                self.library[data[0]] = int(data[1])
+                self.library[data[0]] = float(data[1])
         return

@@ -208,7 +208,7 @@ class Ledger:
         """
         ret = ''
         for item, value in self.library.library.items():
-            ret += '%s: %d\n' % (item, value)
+            ret += '{}: {}\n'.format(item, value)
         return ret
 
     def set_value(self, command: str, key: str) -> str:
@@ -495,7 +495,7 @@ class Ledger:
         self.transaction_lock = not self.transaction_lock
         return
 
-    def toggle_stroe_lock(self) -> None:
+    def toggle_store_lock(self) -> None:
         """
         Lock store function.
         """

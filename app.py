@@ -7,7 +7,7 @@ from ledger import Ledger
 import string
 client = discord.Client()
 
-VERSION = '1.1.2'
+VERSION = '1.1.3'
 
 qwk_help = """For more specific help type help [topic].
 Topics are :
@@ -365,6 +365,8 @@ async def on_message(message):
                 da_books[message.server].save()
             else:
                 mess += 'Item could not be added.\n'
+            if ',' in item:
+                mess += 'Item cannot have , in it. Use ; instead.'
             await client.send_message(
                 message.channel,
                 mess
