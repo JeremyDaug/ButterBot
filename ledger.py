@@ -100,18 +100,18 @@ class Ledger:
         """
         return self.library.new_item(name=name, value=value)
 
-    # def delete_item(self, name: str, key: str) -> bool:
-    #     """
-    #     A helper function to remove an item from the library.
-    #     Calls self.library.delete_item()
-    #
-    #     :param name: The item to be deleted.
-    #     :param key: The user's key to ensure it is the admin.
-    #     :return: True if successful, false if anything went wrong.
-    #     """
-    #     if key != self.bank.key:
-    #         return False
-    #     return self.library.delete_item(name)
+    def delete_item(self, name: str, key: str) -> bool:
+        """
+        A helper function to remove an item from the library.
+        Calls self.library.delete_item()
+
+        :param name: The item to be deleted.
+        :param key: The user's key to ensure it is the admin.
+        :return: True if successful, false if anything went wrong.
+        """
+        if key != self.bank.key:
+            return False
+        return self.library.delete_item(name)
 
     def admin_new_item(self, key: str, name: str, value: float) -> bool:
         """
