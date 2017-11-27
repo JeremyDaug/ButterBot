@@ -7,7 +7,7 @@ from ledger import Ledger
 import string
 client = discord.Client()
 
-VERSION = '1.1.3'
+VERSION = '1.1.4'
 
 qwk_help = """For more specific help type help [topic].
 Topics are :

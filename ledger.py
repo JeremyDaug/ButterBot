@@ -431,10 +431,11 @@ class Ledger:
         items = self.get_account(account=account).inventory
         total_value = float(value) + sum([amount*self.library.library[item] if self.library.library[item] >= 0 else 0
                                           for item, amount in items.items()])
-        items_str = ''
-        for item, amount in items.items():
-            items_str += '%s:%d,' % (item, amount)
-        return value, items, total_value, "%s has %d and %s for a total value of %d.\n" % (account, value, items_str, total_value)
+        items_str = '\n'
+        names = sorted([i for i in items.keys()])
+        for name in names:
+            items_str += '%s:%d, \n' % (name, items[name])
+        return value, items, total_value, "%s has %d and %s Total value of %d.\n" % (account, value, items_str, total_value)
 
     def total_value(self) -> Tuple[float, Mapping[str, int], float, str]:
         """Retrieves the total value of the pot and all users combined.
